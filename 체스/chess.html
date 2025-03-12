@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Chess Game</title>
+    <!-- Chessboard.js 스타일 및 스크립트 -->
+    <link rel="stylesheet" href="https://unpkg.com/chessboard-js@1.0.0/dist/chessboard-1.0.0.min.css">
+    <script src="https://unpkg.com/chessboard-js@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    <!-- Chess.js 스크립트 -->
+    <script src="https://unpkg.com/chess.js@0.13.4/chess.min.js"></script>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            flex-direction: column;
+        }
+        #status {
+            margin-top: 20px;
+            font-size: 20px;
+            font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+<body>
+<div id="board" style="width: 400px"></div>
+<div id="status"></div>
+
+<script>
+    // 체스 게임 초기화
+    var chess = new Chess();
+    var statusEl = document.getElementById('status');
+
+    // 보드 설정
+    var config = {
+        draggable: true,
+        position: 'start',
+        onDragStart: onDragStart,
+        onDrop: onDrop,
+        onSnapEnd: onSnapEnd
+    };
+    var board = Chessboard('board', config);
+
+    // 드래그 시작 시 호출
+    function onDragStart(source, piece, position, orientation) {
+        // 게임이 끝났으면 드래그 불가
+        if (chess.game_over()) return false;
+        // 현재 턴에 맞지 않는 기물은 드래그 불가
+        if ((chess.turn() === 'w' && piece.search(/^b/) !== -1) ||
+            (chess.turn() === 'b' && piece.search(/^w/) !== -1)) {
+            return false;
+        }
+    }
+
+    // 드롭 시 호출
+    function onDrop(source, target) {
+        // 이동 시도
+        var move = chess.move({
+            from: source,
+            to: target,
+            promotion: 'q' // 기본적으로 퀸으로 프로모션
+        });
+
+        // 유효하지 않은 이동이면 원래 위치로
+        if (move === null) return 'snapback';
+
+        // 상태 업데이트
+        updateStatus();
+    }
+
+    // 이동 후 보드 업데이트
+    function onSnapEnd() {
+        board.position(chess.fen());
+    }
+
+    // 게임 상태 업데이트
+    function updateStatus() {
+        var status = '';
+        var turn = chess.turn() === 'w' ? 'White' : 'Black';
+
+        if (chess.in_checkmate()) {
+            status = 'Game over, ' + turn + ' is in checkmate.';
+        } else if (chess.in_draw()) {
+            status = 'Game over, drawn position.';
+        } else {
+            status = turn + ' to move';
+            if (chess.in_check()) {
+                status += ', ' + turn + ' is in check';
+            }
+        }
+
+        statusEl.innerText = status;
+    }
+
+    // 초기 상태 설정
+    updateStatus();
+</script>
+</body>
+</html>
