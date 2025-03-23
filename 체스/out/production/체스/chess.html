@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Chess Board</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column; /* 턴 표시와 체스판을 세로로 배치 */
+            justify-content: center;
+            align-items: center;
+        }
+        .chessboard {
+            width: 400px;
+            height: 400px;
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+        }
+        .square {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .white {
+            background-color: #f0d9b5;
+        }
+        .black {
+            background-color: #b58863;
+        }
+        .selected {
+            background-color: #ffff99;
+        }
+        #turn {
+            margin-bottom: 10px; /* 체스판과 간격 */
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+<div id="turn">현재 턴: 백</div>
+<div class="chessboard" id="board"></div>
+
+<script>
+    const board = document.getElementById('board');
+    const turnDisplay = document.getElementById('turn');
+    const pieces = [
+        ['♜', '♞', '♝', '♛', '♚', '♝', '♞', '♜'],
+        ['♟', '♟', '♟', '♟', '♟', '♟', '♟', '♟'],
+        ['', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', ''],
+        ['♙', '♙', '♙', '♙', '♙', '♙', '♙', '♙'],
+        ['♖', '♘', '♗', '♕', '♔', '♗', '♘', '♖']
+    ];
+    let selectedSquare = null;
+    let currentTurn = 'white'; // 백이 먼저 시작
+
+    // 체스판 생성
+    for (let i = 0; i < 8; i++) {
+        for (let j = 0; j < 8; j++) {
+            const square = document.createElement('div');
+            square.className = 'square ' + ((i + j) % 2 === 0 ? 'white' : 'black');
+            square.textContent = pieces[i][j];
+            square.dataset.row = i;
+            square.dataset.col = j;
+            square.addEventListener('click', handleSquareClick);
+            board.appendChild(square);
+        }
+    }
+
+    // 클릭 처리
+    function handleSquareClick(event) {
+        const square = event.target;
+        const row = parseInt(square.dataset.row);
+        const col = parseInt(square.dataset.col);
+        const piece = pieces[row][col];
+
+        if (selectedSquare) {
+            // 이동 처리
+            if (canMoveTo(row, col)) {
+                pieces[row][col] = pieces[selectedSquare.row][selectedSquare.col];
+                pieces[selectedSquare.row][selectedSquare.col] = '';
+                selectedSquare.element.classList.remove('selected');
+                updateBoard();
+                switchTurn();
+                selectedSquare = null;
+            }
+        } else if (piece !== '' && isValidTurn(piece)) {
+            // 기물 선택
+            selectedSquare = { row, col, element: square };
+            square.classList.add('selected');
+        }
+    }
+
+    // 턴 확인
+    function isValidTurn(piece) {
+        const whitePieces = /[♔♕♖♗♘♙]/;
+        const blackPieces = /[♚♛♜♝♞♟]/;
+        return (currentTurn === 'white' && whitePieces.test(piece)) ||
+               (currentTurn === 'black' && blackPieces.test(piece));
+    }
+
+    // 이동 가능 여부 (임시로 항상 true, 나중에 규칙 추가)
+    function canMoveTo(row, col) {
+        return pieces[row][col] !== pieces[selectedSquare.row][selectedSquare.col]; // 같은 칸으로는 못 감
+    }
+
+    // 턴 전환
+    function switchTurn() {
+        currentTurn = currentTurn === 'white' ? 'black' : 'white';
+        turnDisplay.textContent = `현재 턴: ${currentTurn === 'white' ? '백' : '흑'}`;
+    }
+
+    // 체스판 업데이트
+    function updateBoard() {
+        const squares = document.querySelectorAll('.square');
+        squares.forEach(square => {
+            const row = parseInt(square.dataset.row);
+            const col = parseInt(square.dataset.col);
+            square.textContent = pieces[row][col];
+        });
+    }
+</script>
+</body>
+</html>

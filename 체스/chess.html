@@ -1,103 +1,359 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Local Chess Game</title>
-    <!-- Chessboard.js 스타일 및 스크립트 -->
-    <link rel="stylesheet" href="https://unpkg.com/chessboard-js@1.0.0/dist/chessboard-1.0.0.min.css">
-    <script src="https://unpkg.com/chessboard-js@1.0.0/dist/chessboard-1.0.0.min.js"></script>
-    <!-- Chess.js 스크립트 -->
-    <script src="https://unpkg.com/chess.js@0.13.4/chess.min.js"></script>
+    <title>Chess Board</title>
     <style>
         body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .chessboard {
+            width: 400px;
+            height: 400px;
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+        }
+        .square {
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f0f0;
-            flex-direction: column;
+            font-size: 24px;
+            cursor: pointer;
         }
-        #status {
-            margin-top: 20px;
-            font-size: 20px;
-            font-family: Arial, sans-serif;
+        .white {
+            background-color: #f0d9b5;
+        }
+        .black {
+            background-color: #b58863;
+        }
+        .selected {
+            background-color: #ffff99;
+        }
+        #turn {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        #message {
+            margin-top: 10px;
+            font-size: 18px;
+            color: red;
+        }
+        #restart {
+            display: none;
+            margin-left: 20px;
+            font-size: 16px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        .game-over {
+            display: flex;
+            align-items: center;
         }
     </style>
 </head>
 <body>
-<div id="board" style="width: 400px"></div>
-<div id="status"></div>
+<div id="turn">현재 턴: 백</div>
+<div class="chessboard" id="board"></div>
+<div class="game-over">
+    <div id="message"></div>
+    <button id="restart">다시하기</button>
+</div>
 
 <script>
-    // 체스 게임 초기화
-    var chess = new Chess();
-    var statusEl = document.getElementById('status');
+    const board = document.getElementById('board');
+    const turnDisplay = document.getElementById('turn');
+    const messageDisplay = document.getElementById('message');
+    const restartButton = document.getElementById('restart');
+    let pieces = [
+        ['♜', '♞', '♝', '♛', '♚', '♝', '♞', '♜'],
+        ['♟', '♟', '♟', '♟', '♟', '♟', '♟', '♟'],
+        ['', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', ''],
+        ['♙', '♙', '♙', '♙', '♙', '♙', '♙', '♙'],
+        ['♖', '♘', '♗', '♕', '♔', '♗', '♘', '♖']
+    ];
+    let selectedSquare = null;
+    let currentTurn = 'white';
+    let lastMove = null;
+    let whiteKingMoved = false;
+    let blackKingMoved = false;
+    let whiteRooksMoved = [false, false];
+    let blackRooksMoved = [false, false];
 
-    // 보드 설정
-    var config = {
-        draggable: true,
-        position: 'start',
-        onDragStart: onDragStart,
-        onDrop: onDrop,
-        onSnapEnd: onSnapEnd
-    };
-    var board = Chessboard('board', config);
+    // 초기 체스판 생성
+    initializeBoard();
 
-    // 드래그 시작 시 호출
-    function onDragStart(source, piece, position, orientation) {
-        // 게임이 끝났으면 드래그 불가
-        if (chess.game_over()) return false;
-        // 현재 턴에 맞지 않는 기물은 드래그 불가
-        if ((chess.turn() === 'w' && piece.search(/^b/) !== -1) ||
-            (chess.turn() === 'b' && piece.search(/^w/) !== -1)) {
-            return false;
-        }
-    }
-
-    // 드롭 시 호출
-    function onDrop(source, target) {
-        // 이동 시도
-        var move = chess.move({
-            from: source,
-            to: target,
-            promotion: 'q' // 기본적으로 퀸으로 프로모션
-        });
-
-        // 유효하지 않은 이동이면 원래 위치로
-        if (move === null) return 'snapback';
-
-        // 상태 업데이트
-        updateStatus();
-    }
-
-    // 이동 후 보드 업데이트
-    function onSnapEnd() {
-        board.position(chess.fen());
-    }
-
-    // 게임 상태 업데이트
-    function updateStatus() {
-        var status = '';
-        var turn = chess.turn() === 'w' ? 'White' : 'Black';
-
-        if (chess.in_checkmate()) {
-            status = 'Game over, ' + turn + ' is in checkmate.';
-        } else if (chess.in_draw()) {
-            status = 'Game over, drawn position.';
-        } else {
-            status = turn + ' to move';
-            if (chess.in_check()) {
-                status += ', ' + turn + ' is in check';
+    function initializeBoard() {
+        board.innerHTML = '';
+        for (let i = 0; i < 8; i++) {
+            for (let j = 0; j < 8; j++) {
+                const square = document.createElement('div');
+                square.className = 'square ' + ((i + j) % 2 === 0 ? 'white' : 'black');
+                square.textContent = pieces[i][j];
+                square.dataset.row = i;
+                square.dataset.col = j;
+                square.addEventListener('click', handleSquareClick);
+                board.appendChild(square);
             }
         }
-
-        statusEl.innerText = status;
     }
 
-    // 초기 상태 설정
-    updateStatus();
+    // 클릭 처리
+    function handleSquareClick(event) {
+        const square = event.target;
+        const row = parseInt(square.dataset.row);
+        const col = parseInt(square.dataset.col);
+        const piece = pieces[row][col];
+
+        if (selectedSquare) {
+            if (canMoveTo(selectedSquare.row, selectedSquare.col, row, col)) {
+                handleMove(selectedSquare.row, selectedSquare.col, row, col);
+                selectedSquare.element.classList.remove('selected');
+                updateBoard();
+                const opponent = currentTurn === 'white' ? 'black' : 'white';
+                if (isCheckmate(opponent)) {
+                    messageDisplay.textContent = `체크메이트! ${opponent === 'white' ? '흑' : '백'} 승리!`;
+                    restartButton.style.display = 'block';
+                    board.querySelectorAll('.square').forEach(sq => sq.removeEventListener('click', handleSquareClick));
+                } else if (isInCheck(opponent)) {
+                    messageDisplay.textContent = '체크!';
+                } else {
+                    messageDisplay.textContent = '';
+                }
+                switchTurn();
+                selectedSquare = null;
+            } else {
+                selectedSquare.element.classList.remove('selected');
+                selectedSquare = null;
+            }
+        }
+        if (piece !== '' && isValidTurn(piece)) {
+            selectedSquare = { row, col, element: square };
+            square.classList.add('selected');
+        }
+    }
+
+    // 이동 처리
+    function handleMove(fromRow, fromCol, toRow, toCol) {
+        const piece = pieces[fromRow][fromCol];
+        const dx = toRow - fromRow;
+        const dy = toCol - fromCol;
+
+        // 앙파상 처리
+        if ((piece === '♙' || piece === '♟') && Math.abs(dy) === 1 && pieces[toRow][toCol] === '' && isEnPassant(fromRow, fromCol, toRow, toCol)) {
+            if (piece === '♙') pieces[toRow + 1][toCol] = ''; // 흑 폰 제거
+            if (piece === '♟') pieces[toRow - 1][toCol] = ''; // 백 폰 제거
+        }
+
+        pieces[toRow][toCol] = piece;
+        pieces[fromRow][fromCol] = '';
+        lastMove = { fromRow, fromCol, toRow, toCol, piece };
+
+        if (piece === '♔') whiteKingMoved = true;
+        if (piece === '♚') blackKingMoved = true;
+        if (piece === '♖' && fromRow === 7 && fromCol === 0) whiteRooksMoved[0] = true;
+        if (piece === '♖' && fromRow === 7 && fromCol === 7) whiteRooksMoved[1] = true;
+        if (piece === '♜' && fromRow === 0 && fromCol === 0) blackRooksMoved[0] = true;
+        if (piece === '♜' && fromRow === 0 && fromCol === 7) blackRooksMoved[1] = true;
+
+        if (piece === '♔' && Math.abs(toCol - fromCol) === 2) {
+            if (toCol === 6) { pieces[7][5] = '♖'; pieces[7][7] = ''; }
+            if (toCol === 2) { pieces[7][3] = '♖'; pieces[7][0] = ''; }
+        }
+        if (piece === '♚' && Math.abs(toCol - fromCol) === 2) {
+            if (toCol === 6) { pieces[0][5] = '♜'; pieces[0][7] = ''; }
+            if (toCol === 2) { pieces[0][3] = '♜'; pieces[0][0] = ''; }
+        }
+    }
+
+    // 턴 확인
+    function isValidTurn(piece) {
+        const whitePieces = /[♔♕♖♗♘♙]/;
+        const blackPieces = /[♚♛♜♝♞♟]/;
+        return (currentTurn === 'white' && whitePieces.test(piece)) ||
+               (currentTurn === 'black' && blackPieces.test(piece));
+    }
+
+    // 이동 가능 여부
+    function canMoveTo(fromRow, fromCol, toRow, toCol) {
+        const piece = pieces[fromRow][fromCol];
+        const target = pieces[toRow][toCol];
+        const isWhite = /[♔♕♖♗♘♙]/.test(piece);
+        const dx = toRow - fromRow;
+        const dy = toCol - fromCol;
+
+        if (target !== '' && (isWhite === /[♔♕♖♗♘♙]/.test(target))) return false;
+
+        switch (piece) {
+            case '♙':
+                if (dy === 0 && dx === -1 && target === '') return true;
+                if (dy === 0 && dx === -2 && fromRow === 6 && target === '' && pieces[fromRow - 1][fromCol] === '') return true;
+                if (Math.abs(dy) === 1 && dx === -1 && (target !== '' || isEnPassant(fromRow, fromCol, toRow, toCol))) return true;
+                return false;
+            case '♟':
+                if (dy === 0 && dx === 1 && target === '') return true;
+                if (dy === 0 && dx === 2 && fromRow === 1 && target === '' && pieces[fromRow + 1][fromCol] === '') return true;
+                if (Math.abs(dy) === 1 && dx === 1 && (target !== '' || isEnPassant(fromRow, fromCol, toRow, toCol))) return true;
+                return false;
+            case '♖': case '♜':
+                return (dx === 0 || dy === 0) && isPathClear(fromRow, fromCol, toRow, toCol);
+            case '♗': case '♝':
+                return (Math.abs(dx) === Math.abs(dy)) && isPathClear(fromRow, fromCol, toRow, toCol);
+            case '♕': case '♛':
+                return ((dx === 0 || dy === 0) || (Math.abs(dx) === Math.abs(dy))) && isPathClear(fromRow, fromCol, toRow, toCol);
+            case '♔': case '♚':
+                if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) return true;
+                return isCastling(fromRow, fromCol, toRow, toCol);
+            case '♘': case '♞':
+                return (Math.abs(dx) === 2 && Math.abs(dy) === 1) || (Math.abs(dx) === 1 && Math.abs(dy) === 2);
+            default:
+                return false;
+        }
+    }
+
+    // 경로에 장애물 확인
+    function isPathClear(fromRow, fromCol, toRow, toCol) {
+        const dx = Math.sign(toRow - fromRow);
+        const dy = Math.sign(toCol - fromCol);
+        let row = fromRow + dx;
+        let col = fromCol + dy;
+        while (row !== toRow || col !== toCol) {
+            if (pieces[row][col] !== '') return false;
+            row += dx;
+            col += dy;
+        }
+        return true;
+    }
+
+    // 앙파상 확인
+    function isEnPassant(fromRow, fromCol, toRow, toCol) {
+        if (!lastMove) return false;
+        const piece = pieces[fromRow][fromCol];
+        const dx = toRow - fromRow;
+        const dy = toCol - fromCol;
+
+        if (piece === '♙' && dx === -1 && Math.abs(dy) === 1 && fromRow === 3 &&
+            lastMove.toRow === 3 && lastMove.fromRow === 1 && lastMove.toCol === toCol && lastMove.piece === '♟') {
+            return true;
+        }
+        if (piece === '♟' && dx === 1 && Math.abs(dy) === 1 && fromRow === 4 &&
+            lastMove.toRow === 4 && lastMove.fromRow === 6 && lastMove.toCol === toCol && lastMove.piece === '♙') {
+            return true;
+        }
+        return false;
+    }
+
+    // 캐슬링 확인
+    function isCastling(fromRow, fromCol, toRow, toCol) {
+        const piece = pieces[fromRow][fromCol];
+        if (piece === '♔' && fromRow === 7 && fromCol === 4 && !whiteKingMoved) {
+            if (toCol === 6 && !whiteRooksMoved[1] && pieces[7][5] === '' && pieces[7][6] === '') return true;
+            if (toCol === 2 && !whiteRooksMoved[0] && pieces[7][1] === '' && pieces[7][2] === '' && pieces[7][3] === '') return true;
+        }
+        if (piece === '♚' && fromRow === 0 && fromCol === 4 && !blackKingMoved) {
+            if (toCol === 6 && !blackRooksMoved[1] && pieces[0][5] === '' && pieces[0][6] === '') return true;
+            if (toCol === 2 && !blackRooksMoved[0] && pieces[0][1] === '' && pieces[0][2] === '' && pieces[0][3] === '') return true;
+        }
+        return false;
+    }
+
+    // 체크 확인
+    function isInCheck(turn) {
+        const king = turn === 'white' ? '♔' : '♚';
+        let kingRow, kingCol;
+        for (let i = 0; i < 8; i++) {
+            for (let j = 0; j < 8; j++) {
+                if (pieces[i][j] === king) {
+                    kingRow = i;
+                    kingCol = j;
+                    break;
+                }
+            }
+        }
+        for (let i = 0; i < 8; i++) {
+            for (let j = 0; j < 8; j++) {
+                if (pieces[i][j] !== '' && isValidTurn(pieces[i][j]) !== (turn === 'white') &&
+                    canMoveTo(i, j, kingRow, kingCol)) return true;
+            }
+        }
+        return false;
+    }
+
+    // 체크메이트 확인
+    function isCheckmate(turn) {
+        if (!isInCheck(turn)) return false;
+        for (let fromRow = 0; fromRow < 8; fromRow++) {
+            for (let fromCol = 0; fromCol < 8; fromCol++) {
+                const piece = pieces[fromRow][fromCol];
+                if (piece !== '' && isValidTurn(piece) === (turn === 'white')) {
+                    for (let toRow = 0; toRow < 8; toRow++) {
+                        for (let toCol = 0; toCol < 8; toCol++) {
+                            if (canMoveTo(fromRow, fromCol, toRow, toCol)) {
+                                const temp = pieces[toRow][toCol];
+                                pieces[toRow][toCol] = piece;
+                                pieces[fromRow][fromCol] = '';
+                                const stillInCheck = isInCheck(turn);
+                                pieces[fromRow][fromCol] = piece;
+                                pieces[toRow][toCol] = temp;
+                                if (!stillInCheck) return false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    // 턴 전환
+    function switchTurn() {
+        currentTurn = currentTurn === 'white' ? 'black' : 'white';
+        turnDisplay.textContent = `현재 턴: ${currentTurn === 'white' ? '백' : '흑'}`;
+    }
+
+    // 체스판 업데이트
+    function updateBoard() {
+        const squares = document.querySelectorAll('.square');
+        squares.forEach(square => {
+            const row = parseInt(square.dataset.row);
+            const col = parseInt(square.dataset.col);
+            square.textContent = pieces[row][col];
+        });
+    }
+
+    // 게임 리셋
+    function resetGame() {
+        pieces = [
+            ['♜', '♞', '♝', '♛', '♚', '♝', '♞', '♜'],
+            ['♟', '♟', '♟', '♟', '♟', '♟', '♟', '♟'],
+            ['', '', '', '', '', '', '', ''],
+            ['', '', '', '', '', '', '', ''],
+            ['', '', '', '', '', '', '', ''],
+            ['', '', '', '', '', '', '', ''],
+            ['♙', '♙', '♙', '♙', '♙', '♙', '♙', '♙'],
+            ['♖', '♘', '♗', '♕', '♔', '♗', '♘', '♖']
+        ];
+        selectedSquare = null;
+        currentTurn = 'white';
+        lastMove = null;
+        whiteKingMoved = false;
+        blackKingMoved = false;
+        whiteRooksMoved = [false, false];
+        blackRooksMoved = [false, false];
+        messageDisplay.textContent = '';
+        restartButton.style.display = 'none';
+        initializeBoard();
+    }
+
+    restartButton.addEventListener('click', resetGame);
 </script>
 </body>
 </html>
